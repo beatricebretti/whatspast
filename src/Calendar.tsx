@@ -1,11 +1,125 @@
-import {useMemo,useState} from 'react';
-import {ChevronLeft,ChevronRight,CalendarDays,X} from 'lucide-react';
-import {dayKey,mediaName} from './media.mjs';
-import {FavoriteButton} from './Favorites';
-import type {Message} from './types';
-export function Calendar({messages,day,onChange,favoriteDays,onToggleDay}:{messages:Message[];day:string;onChange:(day:string)=>void;favoriteDays:string[];onToggleDay:(day:string)=>void}){
- const [month,setMonth]=useState(()=>{const d=day?new Date(day+'T12:00:00'):new Date(messages.at(-1)?.timestamp||Date.now());return new Date(d.getFullYear(),d.getMonth(),1);});
- const activity=useMemo(()=>{const map=new Map<string,{messages:number;media:number}>();for(const m of messages){const key=dayKey(m.timestamp),n=map.get(key)||{messages:0,media:0};n.messages++;if(mediaName(m.text))n.media++;map.set(key,n);}return map;},[messages]);
- const offset=(month.getDay()+6)%7,length=new Date(month.getFullYear(),month.getMonth()+1,0).getDate();
- return <section className="calendar-view" aria-label="Conversation calendar"><div className="calendar-top"><div><CalendarDays size={19}/><strong>Find a day to remember</strong></div><p>Choose a day to explore it, or star it to save for later.</p></div><div className="calendar-month"><button className="icon-button" aria-label="Previous month" onClick={()=>setMonth(new Date(month.getFullYear(),month.getMonth()-1,1))}><ChevronLeft size={19}/></button><h3 aria-live="polite">{month.toLocaleDateString(undefined,{month:'long',year:'numeric'})}</h3><button className="icon-button" aria-label="Next month" onClick={()=>setMonth(new Date(month.getFullYear(),month.getMonth()+1,1))}><ChevronRight size={19}/></button></div><div className="calendar-grid">{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=><span className="weekday" key={d}>{d}</span>)}{Array.from({length:offset},(_,i)=><span key={'blank'+i}/>)}{Array.from({length},(_,i)=>{const key=dayKey(new Date(month.getFullYear(),month.getMonth(),i+1).getTime()),count=activity.get(key);return <div key={key} className={`calendar-day ${count?'has-activity':''} ${key===day?'chosen':''} ${count?'':'no-activity'}`}><button className="calendar-day-content" disabled={!count} aria-pressed={key===day} aria-label={`${key}, ${count?.messages||0} messages, ${count?.media||0} media files`} onClick={()=>onChange(key)}><strong>{i+1}</strong>{count&&<><span>{count.messages.toLocaleString()} messages</span><small>{count.media?`${count.media.toLocaleString()} media`:'Text only'}</small></>}</button>{count&&<FavoriteButton active={favoriteDays.includes(key)} onClick={()=>onToggleDay(key)} label={key}/>}</div>;})}</div><div className="calendar-legend"><span><i/>Days with conversation</span>{day&&<button onClick={()=>onChange('')}><X size={13}/>Show all dates</button>}</div></section>;
+import { useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, CalendarDays, X } from 'lucide-react';
+import { dayKey, mediaName } from './media.mjs';
+import { FavoriteButton } from './Favorites';
+import type { Message } from './types';
+export function Calendar({
+  messages,
+  day,
+  onChange,
+  favoriteDays,
+  onToggleDay,
+}: {
+  messages: Message[];
+  day: string;
+  onChange: (day: string) => void;
+  favoriteDays: string[];
+  onToggleDay: (day: string) => void;
+}) {
+  const [month, setMonth] = useState(() => {
+    const d = day
+      ? new Date(day + 'T12:00:00')
+      : new Date(messages.at(-1)?.timestamp || Date.now());
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+  const activity = useMemo(() => {
+    const map = new Map<string, { messages: number; media: number }>();
+    for (const m of messages) {
+      const key = dayKey(m.timestamp),
+        n = map.get(key) || { messages: 0, media: 0 };
+      n.messages++;
+      if (mediaName(m.text)) n.media++;
+      map.set(key, n);
+    }
+    return map;
+  }, [messages]);
+  const offset = (month.getDay() + 6) % 7,
+    length = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  return (
+    <section className="calendar-view" aria-label="Conversation calendar">
+      <div className="calendar-top">
+        <div>
+          <CalendarDays size={19} />
+          <strong>Find a day to remember</strong>
+        </div>
+        <p>Choose a day to explore it, or star it to save for later.</p>
+      </div>
+      <div className="calendar-month">
+        <button
+          className="icon-button"
+          aria-label="Previous month"
+          onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
+        >
+          <ChevronLeft size={19} />
+        </button>
+        <h3 aria-live="polite">
+          {month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+        </h3>
+        <button
+          className="icon-button"
+          aria-label="Next month"
+          onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
+        >
+          <ChevronRight size={19} />
+        </button>
+      </div>
+      <div className="calendar-grid">
+        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
+          <span className="weekday" key={d}>
+            {d}
+          </span>
+        ))}
+        {Array.from({ length: offset }, (_, i) => (
+          <span key={'blank' + i} />
+        ))}
+        {Array.from({ length }, (_, i) => {
+          const key = dayKey(new Date(month.getFullYear(), month.getMonth(), i + 1).getTime()),
+            count = activity.get(key);
+          return (
+            <div
+              key={key}
+              className={`calendar-day ${count ? 'has-activity' : ''} ${key === day ? 'chosen' : ''} ${count ? '' : 'no-activity'}`}
+            >
+              <button
+                className="calendar-day-content"
+                disabled={!count}
+                aria-pressed={key === day}
+                aria-label={`${key}, ${count?.messages || 0} messages, ${count?.media || 0} media files`}
+                onClick={() => onChange(key)}
+              >
+                <strong>{i + 1}</strong>
+                {count && (
+                  <>
+                    <span>{count.messages.toLocaleString()} messages</span>
+                    <small>
+                      {count.media ? `${count.media.toLocaleString()} media` : 'Text only'}
+                    </small>
+                  </>
+                )}
+              </button>
+              {count && (
+                <FavoriteButton
+                  active={favoriteDays.includes(key)}
+                  onClick={() => onToggleDay(key)}
+                  label={key}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="calendar-legend">
+        <span>
+          <i />
+          Days with conversation
+        </span>
+        {day && (
+          <button onClick={() => onChange('')}>
+            <X size={13} />
+            Show all dates
+          </button>
+        )}
+      </div>
+    </section>
+  );
 }
