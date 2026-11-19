@@ -2,6 +2,7 @@ export type Message = { id: number; timestamp: number; sender: string | null; te
 export type Chat = {
   id: string;
   name: string;
+  avatar?: Blob;
   messages: Message[];
   dateOrder: string;
   ambiguous?: boolean;
@@ -12,3 +13,5 @@ export type Chat = {
 
 export type Favorites = { days: string[]; media: string[] };
 export type FavoriteMap = Record<string, Favorites>;
+
+export type ConversationProfile = { id: string; name: string; avatar?: Blob };
