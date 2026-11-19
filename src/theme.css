@@ -1,0 +1,62 @@
+:root {
+  color-scheme: light;
+  --accent: #b35077;
+  --canvas: color-mix(in srgb, var(--accent) 3%, #faf9fa);
+  --surface: color-mix(in srgb, var(--accent) 1%, white);
+  --surface-alt: color-mix(in srgb, var(--accent) 4%, #fcfafb);
+  --text: #392e35;
+  --text-secondary: #65545f;
+  --text-muted: color-mix(in srgb, var(--accent) 12%, #7b6d76);
+  --border: color-mix(in srgb, var(--accent) 12%, #e8e2e6);
+  --accent-border: color-mix(in srgb, var(--accent) 38%, var(--border));
+  --accent-soft: color-mix(in srgb, var(--accent) 9%, var(--surface));
+  --accent-muted: color-mix(in srgb, var(--accent) 25%, var(--surface));
+  --on-accent: #fff;
+  --positive: #4f8a6c;
+  --media-bg: #252228;
+  --shadow-rgb: 55 30 45;
+  --error-bg: #fff0f3;
+  --error-text: #a93953;
+  --participant-0: var(--accent);
+  --participant-1: color-mix(in srgb, var(--accent) 45%, var(--surface));
+  --participant-2: color-mix(in srgb, var(--accent) 30%, #79a792);
+  --participant-3: color-mix(in srgb, var(--accent) 35%, #a693cb);
+}
+:root[data-palette='sage'] {
+  --accent: #357b66;
+}
+:root[data-palette='ocean'] {
+  --accent: #376f9e;
+}
+:root[data-palette='plum'] {
+  --accent: #805591;
+}
+:root[data-mode='dark'] {
+  color-scheme: dark;
+  --accent: #dc8fad;
+  --canvas: color-mix(in srgb, var(--accent) 2%, #171719);
+  --surface: color-mix(in srgb, var(--accent) 2%, #222024);
+  --surface-alt: color-mix(in srgb, var(--accent) 3%, #2a272d);
+  --text: #eee7ed;
+  --text-secondary: #d0c2cc;
+  --text-muted: color-mix(in srgb, var(--accent) 12%, #b3a8af);
+  --border: color-mix(in srgb, var(--accent) 12%, #3b343e);
+  --accent-border: color-mix(in srgb, var(--accent) 40%, var(--border));
+  --accent-soft: color-mix(in srgb, var(--accent) 13%, var(--surface));
+  --accent-muted: color-mix(in srgb, var(--accent) 28%, var(--surface));
+  --on-accent: #211a20;
+  --positive: #93c3a6;
+  --media-bg: #121114;
+  --shadow-rgb: 0 0 0;
+  --error-bg: #442832;
+  --error-text: #efa0b4;
+}
+:root[data-mode='dark'][data-palette='sage'] {
+  --accent: #84bda6;
+}
+:root[data-mode='dark'][data-palette='ocean'] {
+  --accent: #86b4d9;
+}
+:root[data-mode='dark'][data-palette='plum'] {
+  --accent: #bc9ad3;
+}
