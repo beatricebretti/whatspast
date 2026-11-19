@@ -480,21 +480,16 @@ function App() {
               <span className="modal-icon">
                 <MessagesSquare size={30} />
               </span>
-              <div className="eyebrow">YOUR STORIES START HERE</div>
-              <h2>A home for your conversations.</h2>
+              <h2>Your conversations.</h2>
               <p>
                 Import your WhatsApp export to explore messages,
                 <br />
-                relive your media, and discover your conversation’s story.
+                relive your media and discover your conversation’s story.
               </p>
               <button className="primary-button" onClick={() => openImport()}>
                 <Plus size={17} />
                 Import your first conversation
               </button>
-              <span className="welcome-private">
-                <ShieldCheck size={15} />
-                Private, local, and entirely yours.
-              </span>
             </div>
           ) : (
             <>
@@ -1020,16 +1015,15 @@ function App() {
             <div className="modal-icon">
               <FolderOpen size={28} />
             </div>
-            <div className="eyebrow">MAKE ROOM FOR YOUR MEMORIES</div>
             <h2 id="import-title">
               {importTarget
                 ? 'Keep your conversation up to date.'
-                : 'Bring your conversations home.'}
+                : 'Bring your conversations.'}
             </h2>
             <p>
               {importTarget
-                ? 'Import a later export. Overlapping messages are merged, and earlier history, media, and favorites are kept.'
-                : 'Export a WhatsApp chat with media, then choose the ZIP or folder. We’ll take care of the rest.'}
+                ? 'Import a later export. Overlapping messages are merged, and earlier history, media and favorites are kept.'
+                : 'Export a WhatsApp chat with media, then choose the ZIP or folder.'}
             </p>
             <label className="date-select import-target">
               Import into
@@ -1101,10 +1095,6 @@ function App() {
                 Open a chat → tap the contact or group name → Export Chat → Attach Media. Save the
                 export as a ZIP or folder.
               </p>
-            </div>
-            <div className="modal-privacy">
-              <ShieldCheck size={15} />
-              Processed on your device. Your chats stay yours.
             </div>
           </section>
         </div>
