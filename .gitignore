@@ -1,0 +1,24 @@
+node_modules
+dist
+.DS_Store
+*.local
+
+*.tsbuildinfo
+
+# Local credentials and hosting caches
+.env
+.env.*
+!.env.example
+.netlify
+
+# Private WhatsApp exports belong outside the public repository
+/imports/
+/exports/
+/private-data/
+/local-data/
+**/_chat.txt
+**/WhatsApp Chat*/
+*.zip
+*.7z
+*.tar
+*.gz
