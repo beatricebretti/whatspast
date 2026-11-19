@@ -26,3 +26,8 @@ export function filterMessages(messages, { day = '', search = '', kind = 'all' }
       (kind === 'all' || mediaKind(m.text) === kind),
   );
 }
+
+export function sortByTimestamp(items, order = 'newest', getTimestamp = (item) => item.timestamp) {
+  const direction = order === 'oldest' ? 1 : -1;
+  return [...items].sort((a, b) => direction * (getTimestamp(a) - getTimestamp(b)));
+}

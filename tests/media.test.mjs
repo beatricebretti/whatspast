@@ -50,3 +50,32 @@ test('day filter uses local calendar dates and includes both text and media', ()
   assert.equal(filterMessages(messages, { day: '2026-11-21' }).length, 0);
   assert.equal(filterMessages(messages).length, 4);
 });
+
+test('media date sorting does not mutate chronological chat history', async () => {
+  const { sortByTimestamp } = await import('../src/media.mjs');
+  const items = [
+    { id: 1, timestamp: 100 },
+    { id: 2, timestamp: 300 },
+    { id: 3, timestamp: 200 },
+  ];
+  assert.deepEqual(
+    sortByTimestamp(items, 'newest').map((x) => x.id),
+    [2, 3, 1],
+  );
+  assert.deepEqual(
+    sortByTimestamp(items, 'oldest').map((x) => x.id),
+    [1, 3, 2],
+  );
+  assert.deepEqual(
+    items.map((x) => x.id),
+    [1, 2, 3],
+  );
+  assert.deepEqual(
+    sortByTimestamp(
+      items.map((message) => ({ message })),
+      'oldest',
+      (x) => x.message.timestamp,
+    ).map((x) => x.message.id),
+    [1, 3, 2],
+  );
+});
