@@ -78,7 +78,6 @@ export function FavoritesView({
     <div className="favorites-view">
       <div className="section-heading">
         <div>
-          <div className="eyebrow">THE MOMENTS YOU KEEP CLOSE</div>
           <h2>Your favorites</h2>
           <p>Saved days and media from all your conversations.</p>
         </div>
@@ -135,12 +134,7 @@ export function FavoritesView({
           ) : (
             <div className="empty-state">
               <Star size={30} />
-              <h3>Keep a day close</h3>
-              <p>
-                Star a day from the calendar or date bar.
-                <br />
-                You’ll find it here whenever you want to look back.
-              </p>
+              <h3>Star a day from the calendar or date bar</h3>
             </div>
           )}
         </div>
@@ -191,8 +185,7 @@ export function FavoritesView({
           ) : (
             <div className="empty-state">
               <Star size={30} />
-              <h3>No saved media in this view</h3>
-              <p>Use the star on a media preview to save it here.</p>
+              <h3>Use the star on a media preview to save</h3>
             </div>
           )}
         </>

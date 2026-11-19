@@ -16,7 +16,6 @@ export function ConversationStats({ data }: { data: ConversationInsights }) {
         <div className="insight-heading">
           <div>
             <h3>Your most-used emojis</h3>
-            <p>Every emoji counts, including skin tones and combinations.</p>
           </div>
           <select
             aria-label="Emoji statistics participant"
@@ -43,11 +42,7 @@ export function ConversationStats({ data }: { data: ConversationInsights }) {
         )}
       </section>
       <section className="insight-box">
-        <h3>Who says hello first?</h3>
-        <p>
-          The first participant message on each local calendar day. Media counts; system notices and
-          call records do not. The first exported day may be incomplete.
-        </p>
+        <h3>Who messages first?</h3>
         {starters.length ? (
           starters.map(([person, count]) => (
             <div className="starter-stat" key={person}>
@@ -69,9 +64,6 @@ export function ConversationStats({ data }: { data: ConversationInsights }) {
       </section>
       <section className="insight-box">
         <h3>Who starts the calls?</h3>
-        <p>
-          Only exported call records that explicitly identify a caller contribute to these totals.
-        </p>
         {Object.entries(data.calls.byCaller)
           .sort((a, b) => b[1] - a[1])
           .map(([person, count]) => (

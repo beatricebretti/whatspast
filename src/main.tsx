@@ -326,7 +326,7 @@ function App() {
           <Plus size={18} />
           Import a conversation<span>⌘ I</span>
         </button>
-        <div className="nav-label">YOUR SPACE</div>
+        <div className="nav-label">YOUR COLLECTION</div>
         <button
           className={`nav-item ${tab === 'chat' ? 'active' : ''}`}
           onClick={() => setTab('chat')}
@@ -389,48 +389,10 @@ function App() {
               </button>
             ))}
         </div>
-        <div className="privacy-card">
-          <span className="privacy-icon">
-            <ShieldCheck size={21} />
-          </span>
-          <strong>Your memories. Only yours.</strong>
-          <p>No clouds. No accounts. Your chats never leave this device.</p>
-          <span>
-            <span className="green-dot" />
-            100% private & local
-          </span>
-        </div>
-        <div className="sidebar-footer">
-          <span className="mini-logo">
-            <MessageCircle size={16} />
-          </span>
-          Made for the conversations that matter
-          <Heart size={12} />
-        </div>
+        
       </aside>
       <main className="main">
-        <div className="topbar">
-          <span>Your personal chat archive</span>
-          <span className="local-badge">
-            <span className="green-dot" />
-            Offline by design
-          </span>
-          <button
-            className="icon-button mobile-import"
-            aria-label="Import"
-            onClick={() => openImport()}
-          >
-            <Plus size={19} />
-          </button>
-        </div>
         <div className="page-heading">
-          <div>
-            <div className="eyebrow">A LITTLE LOOK BACK</div>
-            <h1>
-              Good conversations deserve a home<span>.</span>
-            </h1>
-            <p>Keep the messages. Relive the moments. Discover the little things.</p>
-          </div>
           <button className="outline-button" onClick={() => openImport()}>
             <Upload size={16} />
             Import chat
@@ -683,7 +645,7 @@ function App() {
                     </div>
                     <footer className="archive-footer">
                       <LockKeyhole size={13} />
-                      <span>This is your archive. Every message, just as you remember it.</span>
+                      <span>This is your archive.</span>
                       <span className="read-only">READ ONLY</span>
                     </footer>
                   </>
@@ -691,8 +653,8 @@ function App() {
                   <div className="media-panel">
                     <div className="section-heading">
                       <div>
-                        <h3>All the little moments</h3>
-                        <p>Photos, videos, stickers, and voice notes.</p>
+                        <h3>All media</h3>
+                        <p>Photos, videos, stickers and voice notes.</p>
                       </div>
                       <span className="pill">{visibleMedia.length} files</span>
                     </div>
@@ -759,9 +721,7 @@ function App() {
                   <div className="insights-panel">
                     <div className="section-heading">
                       <div>
-                        <div className="eyebrow">BETWEEN THE LINES</div>
-                        <h3>Every conversation has a story.</h3>
-                        <p>Here’s a little more of yours.</p>
+                        <h3>Insights</h3>
                       </div>
                       <button className="outline-button" onClick={exportStats}>
                         <Download size={15} />
@@ -790,8 +750,7 @@ function App() {
                     </div>
                     <ConversationStats data={insights} />
                     <div className="insight-box">
-                      <h3>When you catch up</h3>
-                      <p>Messages by hour of the day</p>
+                      <h3>Messages by hour of the day</h3>
                       <div className="hour-chart">
                         {stats.hours.map((n: number, i: number) => (
                           <div className="hour-column" key={i} title={`${i}:00 · ${n} messages`}>
@@ -819,7 +778,7 @@ function App() {
                         <input
                           value={word}
                           onChange={(e) => setWord(e.target.value)}
-                          placeholder="Try ‘love’, ‘coffee’, or an inside joke…"
+                          placeholder="Try ‘love’"
                         />
                       </label>
                       {word &&
@@ -853,7 +812,7 @@ function App() {
                       <MessagesSquare size={21} />
                     </div>
                     <strong>{number(messageCount)}</strong>
-                    <span>messages, countless memories</span>
+                    <span>messages</span>
                   </div>
                   <div className="detail-divider" />
                   <h4>Who’s the talkative one?</h4>
@@ -906,7 +865,6 @@ function App() {
                       </button>
                     ))}
                   </div>
-                  <p className="tiny-note">Common words, laughter, and media labels excluded.</p>
                   <div className="detail-divider" />
                   <h4>Your conversation rhythm</h4>
                   <div className="rhythm">
@@ -929,27 +887,15 @@ function App() {
                   </div>
                   <div className="insights-link">
                     <button onClick={() => setTab('insights')}>
-                      Explore all insights
+                      All insights
                       <ArrowUpRight size={16} />
                     </button>
-                  </div>
-                  <div className="memory-note">
-                    <Heart size={20} />
-                    <p>
-                      Behind every number,
-                      <br />
-                      there’s a moment.
-                    </p>
                   </div>
                 </aside>
               )}
             </>
           )}
         </section>
-        <div className="bottom-note">
-          <ShieldCheck size={14} />
-          Stored on your device. Never on a server.<span>Built with a little nostalgia.</span>
-        </div>
       </main>
       {notice && (
         <div className="toast" role="status">
