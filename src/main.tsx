@@ -18,43 +18,43 @@ import {
   LockKeyhole,
   Trash2,
   Download,
-  Smile,
-  Clock,
   MessagesSquare,
-  Heart,
   CalendarDays,
   ArrowRight,
   LoaderCircle,
-  Play,
-  Music,
   FileText,
   Check,
   Star,
   RefreshCw,
+  PencilLine,
+  ChevronUp,
 } from 'lucide-react';
 import { Virtuoso, VirtuosoGrid } from 'react-virtuoso';
+import type { VirtuosoHandle } from 'react-virtuoso';
 import { ZipReader, BlobReader, TextWriter } from '@zip.js/zip.js';
-import { allChats, saveChat, removeChat } from './storage';
+import { allChats, saveChat, removeChat, saveConversationProfile } from './storage';
+import { ConversationAvatar } from './Avatar';
+import { ConversationEditor } from './ConversationEditor';
+import { AppearanceControl } from './AppearanceControl';
+import { useAppearance } from './useAppearance';
+import { ConversationDetails } from './ConversationDetails';
+import { MediaSort } from './MediaSort';
+import { HighlightedText } from './HighlightedText';
+import { matchingMessageIndexes, nextSearchIndex } from './search.mjs';
+import type { MediaOrder } from './media.mjs';
 import { useArchiveStats } from './useArchiveStats';
 import { ConversationStats } from './ConversationStats';
 import { FavoritesView, FavoriteButton } from './Favorites';
 import { useFavorites } from './useFavorites';
 import { Calendar } from './Calendar';
 import { MessageBody } from './Attachment';
-import { mediaName, mediaKind, filterMessages, dayKey } from './media.mjs';
+import { mediaName, mediaKind, filterMessages, dayKey, sortByTimestamp } from './media.mjs';
 import type { Chat, Message } from './types';
 import './style.css';
-const avatarColors = ['#f7d4df', '#e8e1f3', '#dce9df', '#f6e4d0'];
-const initials = (name: string) =>
-  name
-    .split(' ')
-    .map((s) => s[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
 const date = (n: number) =>
   new Date(n).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 const number = (n: number) => n.toLocaleString();
+const emptyChat: Chat = { id: '', name: '', messages: [], dateOrder: 'dmy' };
 function Logo() {
   return (
     <div className="brand">
@@ -80,11 +80,18 @@ function App() {
     [order, setOrder] = useState('auto'),
     [notice, setNotice] = useState(''),
     [menu, setMenu] = useState(false),
-    [showInfo, setShowInfo] = useState(true),
+    [showInfo, setShowInfo] = useState(() => window.matchMedia('(min-width: 1100px)').matches),
     [word, setWord] = useState(''),
     [selectedDay, setSelectedDay] = useState(''),
     [mediaFilter, setMediaFilter] = useState('all'),
-    [importTarget, setImportTarget] = useState('');
+    [importTarget, setImportTarget] = useState(''),
+    [editing, setEditing] = useState(false),
+    [mediaSort, setMediaSort] = useState<MediaOrder>('newest'),
+    [searchMode, setSearchMode] = useState<'text' | 'word'>('text'),
+    [resultIndex, setResultIndex] = useState(0);
+  const { appearance, setAppearance } = useAppearance();
+  const messageList = useRef<VirtuosoHandle>(null),
+    searchInput = useRef<HTMLInputElement>(null);
   const {
     favorites,
     toggle: toggleFavorite,
@@ -99,6 +106,11 @@ function App() {
         e.preventDefault();
         openImport();
       }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setTab('chat');
+        requestAnimationFrame(() => searchInput.current?.focus());
+      }
       if (e.key === 'Escape') {
         if (!busy) setImportOpen(false);
         setMenu(false);
@@ -108,6 +120,18 @@ function App() {
     return () => window.removeEventListener('keydown', key);
   }, [busy]);
   useEffect(() => {
+    const blocked = () =>
+      setNotice('Close other whatspast tabs, then reload to finish upgrading local storage.');
+    const reload = () =>
+      setNotice('Local storage was upgraded in another tab. Please reload this tab.');
+    window.addEventListener('whatspast-storage-blocked', blocked);
+    window.addEventListener('whatspast-storage-reload', reload);
+    return () => {
+      window.removeEventListener('whatspast-storage-blocked', blocked);
+      window.removeEventListener('whatspast-storage-reload', reload);
+    };
+  }, []);
+  useEffect(() => {
     allChats()
       .then((saved) => {
         const real = saved.filter((c) => !c.demo && c.id !== 'demo');
@@ -115,38 +139,74 @@ function App() {
         setSelected(real[0]?.id || '');
       })
       .catch(() =>
-        setNotice('Browser storage is unavailable. Imports will work for this session.'),
+        setNotice(
+          'Browser storage is unavailable. Please enable site storage to import your chats.',
+        ),
       );
     navigator.storage?.persist?.().catch(() => {});
     if (import.meta.env?.PROD && 'serviceWorker' in navigator)
       navigator.serviceWorker.register('/sw.js').catch(() => {});
   }, []);
-  const chat: Chat = chats.find((c) => c.id === selected) ||
-    chats[0] || { id: '', name: '', messages: [], dateOrder: 'dmy' };
+  const chat: Chat = chats.find((c) => c.id === selected) || chats[0] || emptyChat;
   const scopedMessages = useMemo(
     () => filterMessages(chat.messages, { day: selectedDay }),
-    [chat, selectedDay],
+    [chat.messages, selectedDay],
   );
   const { stats, insights, loading: analyzing } = useArchiveStats(scopedMessages, setNotice);
   const currentFavorites = favorites[chat.id] || { days: [], media: [] };
   const messageCount = scopedMessages.filter((m) => m.sender).length;
   const allPeople = useMemo(
     () => [...new Set(chat.messages.map((m) => m.sender).filter((s): s is string => !!s))],
-    [chat],
+    [chat.messages],
   );
   const people = Object.keys(stats.counts);
   const me = allPeople.includes('You') ? 'You' : allPeople[1] || allPeople[0];
-  const filtered = useMemo(
-    () => filterMessages(scopedMessages, { search }),
-    [scopedMessages, search],
+  const matchingIndexes = useMemo(
+    () => matchingMessageIndexes(scopedMessages, search.trim(), searchMode === 'word'),
+    [scopedMessages, search, searchMode],
   );
+  const matchSet = useMemo(() => new Set(matchingIndexes), [matchingIndexes]);
+  const activeMatch = matchingIndexes[Math.min(resultIndex, matchingIndexes.length - 1)];
+  useEffect(() => {
+    setResultIndex(0);
+    if (tab === 'chat' && search.trim() && matchingIndexes.length) {
+      const frame = requestAnimationFrame(() =>
+        messageList.current?.scrollToIndex({
+          index: matchingIndexes[0],
+          align: 'center',
+          behavior: 'auto',
+        }),
+      );
+      return () => cancelAnimationFrame(frame);
+    }
+  }, [matchingIndexes, tab]);
+  function navigateSearch(step: number) {
+    if (!matchingIndexes.length) return;
+    const next = nextSearchIndex(resultIndex, step, matchingIndexes.length);
+    setResultIndex(next);
+    messageList.current?.scrollToIndex({
+      index: matchingIndexes[next],
+      align: 'center',
+      behavior: 'auto',
+    });
+  }
+  function startWordSearch(word: string) {
+    if (search === word && searchMode === 'word' && tab === 'chat') {
+      navigateSearch(1);
+      return;
+    }
+    setSearchMode('word');
+    setSearch(word);
+    setResultIndex(0);
+    setTab('chat');
+  }
   const mediaMessages = useMemo(
     () => scopedMessages.filter((m) => mediaName(m.text)),
     [scopedMessages],
   );
   const visibleMedia = useMemo(
-    () => filterMessages(mediaMessages, { kind: mediaFilter }),
-    [mediaMessages, mediaFilter],
+    () => sortByTimestamp(filterMessages(mediaMessages, { kind: mediaFilter }), mediaSort),
+    [mediaMessages, mediaFilter, mediaSort],
   );
   const mediaCounts = useMemo(() => {
     const counts: Record<string, number> = { all: mediaMessages.length };
@@ -163,6 +223,8 @@ function App() {
     setMenu(false);
   }
   function select(id: string) {
+    setEditing(false);
+    setSearchMode('text');
     setSelected(id);
     setSearch('');
     setTab('chat');
@@ -282,6 +344,13 @@ function App() {
       if (folderInput.current) folderInput.current.value = '';
     }
   }
+  async function editConversation(name: string, avatar?: Blob) {
+    const id = chat.id;
+    await saveConversationProfile(id, name, avatar);
+    setChats((previous) => previous.map((c) => (c.id === id ? { ...c, name, avatar } : c)));
+    setEditing(false);
+    setNotice('Conversation name and photo saved.');
+  }
   function exportStats() {
     const blob = new Blob(
       [
@@ -321,7 +390,10 @@ function App() {
   return (
     <div className="app">
       <aside className="sidebar">
-        <Logo />
+        <div className="sidebar-heading">
+          <Logo />
+          <AppearanceControl value={appearance} onChange={setAppearance} />
+        </div>
         <button className="new-import" onClick={() => openImport()}>
           <Plus size={18} />
           Import a conversation<span>⌘ I</span>
@@ -364,15 +436,13 @@ function App() {
         <div className="chat-list">
           {chats
             .filter((c) => c.name.toLowerCase().includes(chatSearch.toLowerCase()))
-            .map((c, i) => (
+            .map((c) => (
               <button
                 className={`chat-card ${c.id === chat?.id ? 'selected' : ''}`}
                 key={c.id}
                 onClick={() => select(c.id)}
               >
-                <span className="avatar" style={{ background: avatarColors[i % 4] }}>
-                  {initials(c.name)}
-                </span>
+                <ConversationAvatar chat={c} />
                 <span className="chat-summary">
                   <span className="chat-name">
                     {c.name}
@@ -389,15 +459,8 @@ function App() {
               </button>
             ))}
         </div>
-        
       </aside>
       <main className="main">
-        <div className="page-heading">
-          <button className="outline-button" onClick={() => openImport()}>
-            <Upload size={16} />
-            Import chat
-          </button>
-        </div>
         <section className="workspace">
           {tab === 'favorites' ? (
             <FavoritesView
@@ -409,6 +472,8 @@ function App() {
               }}
               onToggleDay={(id, day) => toggleFavorite(id, 'days', day)}
               onToggleMedia={(id, name) => toggleFavorite(id, 'media', name)}
+              sortOrder={mediaSort}
+              onSortChange={setMediaSort}
             />
           ) : !chat.id ? (
             <div className="welcome-empty">
@@ -435,7 +500,13 @@ function App() {
             <>
               <div className="conversation-main" key={chat.id + chat.updatedAt}>
                 <header className="conversation-header">
-                  <span className="avatar">{initials(chat.name)}</span>
+                  <button
+                    className="avatar-edit"
+                    aria-label="Edit conversation photo and name"
+                    onClick={() => setEditing(true)}
+                  >
+                    <ConversationAvatar chat={chat} />
+                  </button>
                   <div>
                     <h2>{chat.name}</h2>
                     <span className="subtle">
@@ -444,6 +515,13 @@ function App() {
                     </span>
                   </div>
                   <div className="header-actions">
+                    <button
+                      className="icon-button"
+                      aria-label="Edit conversation"
+                      onClick={() => setEditing(true)}
+                    >
+                      <PencilLine size={18} />
+                    </button>
                     <button
                       className="icon-button"
                       aria-label="Toggle conversation details"
@@ -461,6 +539,15 @@ function App() {
                       </button>
                       {menu && (
                         <div className="dropdown">
+                          <button
+                            onClick={() => {
+                              setMenu(false);
+                              setEditing(true);
+                            }}
+                          >
+                            <PencilLine size={15} />
+                            Edit conversation
+                          </button>
                           <button onClick={() => openImport(chat.id)}>
                             <RefreshCw size={15} />
                             Update from export
@@ -537,362 +624,362 @@ function App() {
                     Finding the story in your conversation…
                   </div>
                 )}
-                {tab === 'calendar' ? (
-                  <Calendar
-                    key={chat.id}
-                    messages={chat.messages}
-                    day={selectedDay}
-                    favoriteDays={currentFavorites.days}
-                    onToggleDay={(day) => toggleFavorite(chat.id, 'days', day)}
-                    onChange={(day) => {
-                      setSelectedDay(day);
-                      setSearch('');
-                      if (day) setTab('chat');
-                    }}
-                  />
-                ) : tab === 'chat' ? (
-                  <>
-                    <div className="message-search">
-                      <Search size={17} />
-                      <input
-                        placeholder="Search this conversation…"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
+                <div className="conversation-content">
+                  <div className="conversation-view">
+                    {tab === 'calendar' ? (
+                      <Calendar
+                        key={chat.id}
+                        messages={chat.messages}
+                        day={selectedDay}
+                        favoriteDays={currentFavorites.days}
+                        onToggleDay={(day) => toggleFavorite(chat.id, 'days', day)}
+                        onChange={(day) => {
+                          setSelectedDay(day);
+                          setSearch('');
+                          if (day) setTab('chat');
+                        }}
                       />
-                      {search && (
-                        <>
-                          <span>{number(filtered.length)} results</span>
-                          <button
-                            className="icon-button"
-                            aria-label="Clear search"
-                            onClick={() => setSearch('')}
-                          >
-                            <X size={15} />
-                          </button>
-                        </>
-                      )}
-                      <span className="search-hint">⌕</span>
-                    </div>
-                    {chat.ambiguous && (
-                      <div className="demo-notice">
-                        Dates interpreted as day/month/year. If incorrect, reimport using
-                        month/day/year.
-                      </div>
-                    )}
-                    <div className="message-area">
-                      {filtered.length ? (
-                        <Virtuoso
-                          key={chat.id + search + selectedDay}
-                          style={{ height: '100%' }}
-                          data={filtered}
-                          initialTopMostItemIndex={
-                            selectedDay ? 0 : Math.max(0, filtered.length - 14)
-                          }
-                          itemContent={(index, m) => (
-                            <div className="message-row-wrap">
-                              {(index === 0 ||
-                                new Date(filtered[index - 1].timestamp).toDateString() !==
-                                  new Date(m.timestamp).toDateString()) && (
-                                <div className="day-chip">
-                                  <span>{date(m.timestamp)}</span>
-                                  <FavoriteButton
-                                    active={currentFavorites.days.includes(dayKey(m.timestamp))}
-                                    onClick={() =>
-                                      toggleFavorite(chat.id, 'days', dayKey(m.timestamp))
-                                    }
-                                    label={dayKey(m.timestamp)}
-                                  />
-                                </div>
-                              )}
-                              {!m.sender ? (
-                                <div className="system-message">{m.text}</div>
-                              ) : (
-                                <div className={`message-row ${m.sender === me ? 'outgoing' : ''}`}>
-                                  <div className="bubble">
-                                    {allPeople.length > 2 && (
-                                      <span className="sender">{m.sender}</span>
-                                    )}
-                                    <MessageBody message={m} chatId={chat.id} />
-                                    {mediaName(m.text) && (
+                    ) : tab === 'chat' ? (
+                      <>
+                        <div className="message-search">
+                          <Search size={17} />
+                          <input
+                            ref={searchInput}
+                            placeholder="Search messages, words, or people…"
+                            value={search}
+                            onChange={(e) => {
+                              setSearchMode('text');
+                              setSearch(e.target.value);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                navigateSearch(e.shiftKey ? -1 : 1);
+                              }
+                              if (e.key === 'Escape') {
+                                e.stopPropagation();
+                                setSearch('');
+                              }
+                            }}
+                          />
+                          {search && (
+                            <>
+                              <span className="search-count" aria-live="polite">
+                                {matchingIndexes.length
+                                  ? number(Math.min(resultIndex + 1, matchingIndexes.length))
+                                  : 0}{' '}
+                                / {number(matchingIndexes.length)}
+                              </span>
+                              <button
+                                className="icon-button"
+                                disabled={!matchingIndexes.length}
+                                aria-label="Previous search result"
+                                title="Previous result (Shift+Enter)"
+                                onClick={() => navigateSearch(-1)}
+                              >
+                                <ChevronUp size={17} />
+                              </button>
+                              <button
+                                className="icon-button"
+                                disabled={!matchingIndexes.length}
+                                aria-label="Next search result"
+                                title="Next result (Enter)"
+                                onClick={() => navigateSearch(1)}
+                              >
+                                <ChevronDown size={17} />
+                              </button>
+                              <button
+                                className="icon-button"
+                                aria-label="Clear search"
+                                onClick={() => setSearch('')}
+                              >
+                                <X size={15} />
+                              </button>
+                            </>
+                          )}
+                          <span className="search-hint">⌘ K</span>
+                        </div>
+                        {chat.ambiguous && (
+                          <div className="demo-notice">
+                            Dates interpreted as day/month/year. If incorrect, reimport using
+                            month/day/year.
+                          </div>
+                        )}
+                        <div className="message-area">
+                          {scopedMessages.length && (!search.trim() || matchingIndexes.length) ? (
+                            <Virtuoso
+                              key={chat.id + selectedDay}
+                              ref={messageList}
+                              style={{ height: '100%' }}
+                              data={scopedMessages}
+                              initialTopMostItemIndex={
+                                search.trim() && matchingIndexes.length
+                                  ? matchingIndexes[0]
+                                  : selectedDay
+                                    ? 0
+                                    : Math.max(0, scopedMessages.length - 14)
+                              }
+                              itemContent={(index, m) => (
+                                <div
+                                  className={`message-row-wrap ${search.trim() && matchSet.has(index) ? 'search-match' : ''} ${search.trim() && index === activeMatch ? 'search-current' : ''}`}
+                                >
+                                  {(index === 0 ||
+                                    new Date(scopedMessages[index - 1].timestamp).toDateString() !==
+                                      new Date(m.timestamp).toDateString()) && (
+                                    <div className="day-chip">
+                                      <span>{date(m.timestamp)}</span>
                                       <FavoriteButton
-                                        active={currentFavorites.media.includes(mediaName(m.text)!)}
+                                        active={currentFavorites.days.includes(dayKey(m.timestamp))}
                                         onClick={() =>
-                                          toggleFavorite(chat.id, 'media', mediaName(m.text)!)
+                                          toggleFavorite(chat.id, 'days', dayKey(m.timestamp))
                                         }
-                                        label="attachment"
+                                        label={dayKey(m.timestamp)}
                                       />
-                                    )}
-                                    <span className="message-time">
-                                      {new Date(m.timestamp).toLocaleTimeString(undefined, {
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                      })}
-                                      {m.sender === me && <CheckCheck size={13} />}
-                                    </span>
-                                  </div>
+                                    </div>
+                                  )}
+                                  {!m.sender ? (
+                                    <div className="system-message">
+                                      <HighlightedText
+                                        text={m.text}
+                                        query={search.trim()}
+                                        wholeWord={searchMode === 'word'}
+                                      />
+                                    </div>
+                                  ) : (
+                                    <div
+                                      className={`message-row ${m.sender === me ? 'outgoing' : ''}`}
+                                    >
+                                      <div className="bubble">
+                                        {allPeople.length > 2 && (
+                                          <span className="sender">
+                                            <HighlightedText
+                                              text={m.sender}
+                                              query={search.trim()}
+                                              wholeWord={searchMode === 'word'}
+                                            />
+                                          </span>
+                                        )}
+                                        <MessageBody
+                                          message={m}
+                                          chatId={chat.id}
+                                          highlight={search.trim()}
+                                          wholeWord={searchMode === 'word'}
+                                        />
+                                        {mediaName(m.text) && (
+                                          <FavoriteButton
+                                            active={currentFavorites.media.includes(
+                                              mediaName(m.text)!,
+                                            )}
+                                            onClick={() =>
+                                              toggleFavorite(chat.id, 'media', mediaName(m.text)!)
+                                            }
+                                            label="attachment"
+                                          />
+                                        )}
+                                        <span className="message-time">
+                                          {new Date(m.timestamp).toLocaleTimeString(undefined, {
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                          })}
+                                          {m.sender === me && <CheckCheck size={13} />}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               )}
+                            />
+                          ) : (
+                            <div className="empty-state">
+                              <Search />
+                              <h3>No messages found</h3>
+                              <p>Try another word or phrase.</p>
                             </div>
                           )}
-                        />
-                      ) : (
-                        <div className="empty-state">
-                          <Search />
-                          <h3>No messages found</h3>
-                          <p>Try another word or phrase.</p>
                         </div>
-                      )}
-                    </div>
-                    <footer className="archive-footer">
-                      <LockKeyhole size={13} />
-                      <span>This is your archive.</span>
-                      <span className="read-only">READ ONLY</span>
-                    </footer>
-                  </>
-                ) : tab === 'media' ? (
-                  <div className="media-panel">
-                    <div className="section-heading">
-                      <div>
-                        <h3>All media</h3>
-                        <p>Photos, videos, stickers and voice notes.</p>
-                      </div>
-                      <span className="pill">{visibleMedia.length} files</span>
-                    </div>
-                    <div className="media-filters" role="group" aria-label="Filter media by type">
-                      {[
-                        ['all', 'All media'],
-                        ['image', 'Photos'],
-                        ['video', 'Videos'],
-                        ['sticker', 'Stickers'],
-                        ['audio', 'Audio'],
-                        ['document', 'Documents'],
-                      ].map(([id, label]) => (
-                        <button
-                          key={id}
-                          aria-pressed={mediaFilter === id}
-                          className={mediaFilter === id ? 'active' : ''}
-                          onClick={() => setMediaFilter(id)}
+                        <footer className="archive-footer">
+                          <LockKeyhole size={13} />
+                          <span>This is your archive.</span>
+                          <span className="read-only">READ ONLY</span>
+                        </footer>
+                      </>
+                    ) : tab === 'media' ? (
+                      <div className="media-panel">
+                        <div className="section-heading">
+                          <div>
+                            <h3>All media</h3>
+                            <p>Photos, videos, stickers and voice notes.</p>
+                          </div>
+                          <div className="media-heading-actions">
+                            <span className="pill">{visibleMedia.length} files</span>
+                            <MediaSort value={mediaSort} onChange={setMediaSort} />
+                          </div>
+                        </div>
+                        <div
+                          className="media-filters"
+                          role="group"
+                          aria-label="Filter media by type"
                         >
-                          {label}
-                          <span>{mediaCounts[id] || 0}</span>
-                        </button>
-                      ))}
-                    </div>
-                    {visibleMedia.length ? (
-                      <VirtuosoGrid
-                        style={{ flex: 1, minHeight: 200 }}
-                        key={chat.id + selectedDay + mediaFilter}
-                        data={visibleMedia}
-                        computeItemKey={(_, m) => m.id}
-                        listClassName="media-grid"
-                        itemClassName="media-tile"
-                        itemContent={(_, m) => (
-                          <>
-                            <div className="media-card-top">
-                              <span>{mediaKind(m.text)}</span>
-                              <FavoriteButton
-                                active={currentFavorites.media.includes(mediaName(m.text)!)}
-                                onClick={() => toggleFavorite(chat.id, 'media', mediaName(m.text)!)}
-                              />
-                            </div>
-                            <MessageBody message={m} chatId={chat.id} compact />
-                            <small>{date(m.timestamp)}</small>
-                          </>
+                          {[
+                            ['all', 'All media'],
+                            ['image', 'Photos'],
+                            ['video', 'Videos'],
+                            ['sticker', 'Stickers'],
+                            ['audio', 'Audio'],
+                            ['document', 'Documents'],
+                          ].map(([id, label]) => (
+                            <button
+                              key={id}
+                              aria-pressed={mediaFilter === id}
+                              className={mediaFilter === id ? 'active' : ''}
+                              onClick={() => setMediaFilter(id)}
+                            >
+                              {label}
+                              <span>{mediaCounts[id] || 0}</span>
+                            </button>
+                          ))}
+                        </div>
+                        {visibleMedia.length ? (
+                          <VirtuosoGrid
+                            style={{ flex: 1, minHeight: 0 }}
+                            key={chat.id + selectedDay + mediaFilter + mediaSort}
+                            data={visibleMedia}
+                            computeItemKey={(_, m) => m.id}
+                            listClassName="media-grid"
+                            itemClassName="media-tile"
+                            itemContent={(_, m) => (
+                              <>
+                                <div className="media-card-top">
+                                  <span>{mediaKind(m.text)}</span>
+                                  <FavoriteButton
+                                    active={currentFavorites.media.includes(mediaName(m.text)!)}
+                                    onClick={() =>
+                                      toggleFavorite(chat.id, 'media', mediaName(m.text)!)
+                                    }
+                                  />
+                                </div>
+                                <MessageBody message={m} chatId={chat.id} compact />
+                                <small>{date(m.timestamp)}</small>
+                              </>
+                            )}
+                          />
+                        ) : (
+                          <div className="empty-state">
+                            <ImageIcon size={34} />
+                            <h3>No media in this view</h3>
+                            <p>Try another media type or choose a different date.</p>
+                            <button
+                              className="outline-button"
+                              onClick={() => {
+                                setMediaFilter('all');
+                                setSelectedDay('');
+                              }}
+                            >
+                              Show all media
+                            </button>
+                          </div>
                         )}
-                      />
+                      </div>
                     ) : (
-                      <div className="empty-state">
-                        <ImageIcon size={34} />
-                        <h3>No media in this view</h3>
-                        <p>Try another media type or choose a different date.</p>
-                        <button
-                          className="outline-button"
-                          onClick={() => {
-                            setMediaFilter('all');
-                            setSelectedDay('');
-                          }}
-                        >
-                          Show all media
-                        </button>
+                      <div className="insights-panel">
+                        <div className="section-heading">
+                          <div>
+                            <h3>Insights</h3>
+                          </div>
+                          <button className="outline-button" onClick={exportStats}>
+                            <Download size={15} />
+                            Export
+                          </button>
+                        </div>
+                        <div className="stat-cards">
+                          <Stat
+                            icon={<MessageCircle />}
+                            value={number(messageCount)}
+                            label="Messages exchanged"
+                          />
+                          <Stat
+                            icon={<FileText />}
+                            value={number(stats.wordCount)}
+                            label="Words shared"
+                          />
+                          <Stat
+                            icon={<CalendarDays />}
+                            value={number(
+                              new Set(
+                                scopedMessages.map((m) => new Date(m.timestamp).toDateString()),
+                              ).size,
+                            )}
+                            label="Days with a conversation"
+                          />
+                        </div>
+                        <ConversationStats data={insights} />
+                        <div className="insight-box">
+                          <h3>Messages by hour of the day</h3>
+                          <div className="hour-chart">
+                            {stats.hours.map((n: number, i: number) => (
+                              <div
+                                className="hour-column"
+                                key={i}
+                                title={`${i}:00 · ${n} messages`}
+                              >
+                                <div
+                                  style={{
+                                    height: `${Math.max(2, (n / Math.max(...stats.hours)) * 100)}%`,
+                                  }}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                          <div className="chart-axis">
+                            <span>12 AM</span>
+                            <span>6 AM</span>
+                            <span>12 PM</span>
+                            <span>6 PM</span>
+                            <span>11 PM</span>
+                          </div>
+                        </div>
+                        <div className="insight-box">
+                          <h3>Find your favorite phrase</h3>
+                          <p>Count messages containing a word or phrase, by participant.</p>
+                          <label className="message-search">
+                            <Search size={16} />
+                            <input
+                              value={word}
+                              onChange={(e) => setWord(e.target.value)}
+                              placeholder="Try ‘love’"
+                            />
+                          </label>
+                          {word &&
+                            people.map((p) => (
+                              <div className="word-result" key={p}>
+                                <span>{p}</span>
+                                <strong>
+                                  {number(
+                                    scopedMessages.filter(
+                                      (m) =>
+                                        m.sender === p &&
+                                        m.text.toLowerCase().includes(word.toLowerCase()),
+                                    ).length,
+                                  )}{' '}
+                                  messages
+                                </strong>
+                              </div>
+                            ))}
+                        </div>
                       </div>
                     )}
                   </div>
-                ) : (
-                  <div className="insights-panel">
-                    <div className="section-heading">
-                      <div>
-                        <h3>Insights</h3>
-                      </div>
-                      <button className="outline-button" onClick={exportStats}>
-                        <Download size={15} />
-                        Export
-                      </button>
-                    </div>
-                    <div className="stat-cards">
-                      <Stat
-                        icon={<MessageCircle />}
-                        value={number(messageCount)}
-                        label="Messages exchanged"
-                      />
-                      <Stat
-                        icon={<FileText />}
-                        value={number(stats.wordCount)}
-                        label="Words shared"
-                      />
-                      <Stat
-                        icon={<CalendarDays />}
-                        value={number(
-                          new Set(scopedMessages.map((m) => new Date(m.timestamp).toDateString()))
-                            .size,
-                        )}
-                        label="Days with a conversation"
-                      />
-                    </div>
-                    <ConversationStats data={insights} />
-                    <div className="insight-box">
-                      <h3>Messages by hour of the day</h3>
-                      <div className="hour-chart">
-                        {stats.hours.map((n: number, i: number) => (
-                          <div className="hour-column" key={i} title={`${i}:00 · ${n} messages`}>
-                            <div
-                              style={{
-                                height: `${Math.max(2, (n / Math.max(...stats.hours)) * 100)}%`,
-                              }}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                      <div className="chart-axis">
-                        <span>12 AM</span>
-                        <span>6 AM</span>
-                        <span>12 PM</span>
-                        <span>6 PM</span>
-                        <span>11 PM</span>
-                      </div>
-                    </div>
-                    <div className="insight-box">
-                      <h3>Find your favorite phrase</h3>
-                      <p>Count messages containing a word or phrase, by participant.</p>
-                      <label className="message-search">
-                        <Search size={16} />
-                        <input
-                          value={word}
-                          onChange={(e) => setWord(e.target.value)}
-                          placeholder="Try ‘love’"
-                        />
-                      </label>
-                      {word &&
-                        people.map((p) => (
-                          <div className="word-result" key={p}>
-                            <span>{p}</span>
-                            <strong>
-                              {number(
-                                scopedMessages.filter(
-                                  (m) =>
-                                    m.sender === p &&
-                                    m.text.toLowerCase().includes(word.toLowerCase()),
-                                ).length,
-                              )}{' '}
-                              messages
-                            </strong>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
+                  {showInfo && (
+                    <ConversationDetails
+                      stats={stats}
+                      messageCount={messageCount}
+                      onWord={startWordSearch}
+                      onInsights={() => setTab('insights')}
+                      onClose={() => setShowInfo(false)}
+                    />
+                  )}
+                </div>
               </div>
-              {showInfo && (
-                <aside className="details">
-                  <div className="details-title">
-                    A conversation in numbers
-                    <BarChart3 size={16} />
-                  </div>
-                  <div className="total-stat">
-                    <div className="stat-icon">
-                      <MessagesSquare size={21} />
-                    </div>
-                    <strong>{number(messageCount)}</strong>
-                    <span>messages</span>
-                  </div>
-                  <div className="detail-divider" />
-                  <h4>Who’s the talkative one?</h4>
-                  <div className="talk-bar">
-                    {people.map((p, i) => (
-                      <div
-                        key={p}
-                        style={{
-                          width: `${(stats.counts[p] / Math.max(1, messageCount)) * 100}%`,
-                          background:
-                            i === 0 ? '#ca688b' : i === 1 ? '#f3b8cd' : avatarColors[i % 4],
-                        }}
-                      />
-                    ))}
-                  </div>
-                  {people.map((p, i) => (
-                    <div className="person-stat" key={p}>
-                      <span>
-                        <i
-                          style={{
-                            background:
-                              i === 0 ? '#ca688b' : i === 1 ? '#f3b8cd' : avatarColors[i % 4],
-                          }}
-                        />
-                        {p}
-                      </span>
-                      <strong>
-                        {Math.round((stats.counts[p] / Math.max(1, messageCount)) * 100)}%{' '}
-                        <small>{number(stats.counts[p])}</small>
-                      </strong>
-                    </div>
-                  ))}
-                  <div className="detail-divider" />
-                  <div className="detail-subheading">
-                    <h4>Words on repeat</h4>
-                    <span>TOP 8</span>
-                  </div>
-                  <div className="word-cloud">
-                    {stats.words.slice(0, 8).map(([w, n]: [string, number], i: number) => (
-                      <button
-                        key={w}
-                        className={i === 0 ? 'featured' : ''}
-                        onClick={() => {
-                          setSearch(w);
-                          setTab('chat');
-                        }}
-                      >
-                        {w}
-                        <span>{n}</span>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="detail-divider" />
-                  <h4>Your conversation rhythm</h4>
-                  <div className="rhythm">
-                    <span className="rhythm-icon">
-                      <Clock size={19} />
-                    </span>
-                    <div>
-                      <strong>
-                        {Math.max(...stats.hours) > 0
-                          ? new Date(
-                              2000,
-                              0,
-                              1,
-                              stats.hours.indexOf(Math.max(...stats.hours)),
-                            ).toLocaleTimeString(undefined, { hour: 'numeric' })
-                          : '—'}
-                      </strong>
-                      <span>Your busiest hour</span>
-                    </div>
-                  </div>
-                  <div className="insights-link">
-                    <button onClick={() => setTab('insights')}>
-                      All insights
-                      <ArrowUpRight size={16} />
-                    </button>
-                  </div>
-                </aside>
-              )}
             </>
           )}
         </section>
@@ -905,6 +992,13 @@ function App() {
             <X size={16} />
           </button>
         </div>
+      )}
+      {editing && chat.id && (
+        <ConversationEditor
+          chat={chat}
+          onSave={editConversation}
+          onClose={() => setEditing(false)}
+        />
       )}
       {importOpen && (
         <div className="modal-backdrop" onClick={() => !busy && setImportOpen(false)}>

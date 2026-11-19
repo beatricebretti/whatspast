@@ -3,6 +3,7 @@ import { Download, LoaderCircle, FileText, Image as ImageIcon, Music, Play } fro
 import { getFile } from './storage';
 import { mediaName, mediaKind } from './media.mjs';
 import type { Message } from './types';
+import { HighlightedText } from './HighlightedText';
 // Bound concurrent reads and ZIP decompression while scrolling through large archives.
 let running = 0;
 const waiting: (() => void)[] = [];
@@ -40,10 +41,14 @@ export function MessageBody({
   message,
   chatId,
   compact = false,
+  highlight = '',
+  wholeWord = false,
 }: {
   message: Message;
   chatId: string;
   compact?: boolean;
+  highlight?: string;
+  wholeWord?: boolean;
 }) {
   const name = mediaName(message.text),
     kind = mediaKind(message.text),
@@ -101,7 +106,12 @@ export function MessageBody({
       if (owned) URL.revokeObjectURL(owned);
     };
   }, [chatId, name, visible, retry]);
-  if (!name) return <span className="message-text">{message.text}</span>;
+  if (!name)
+    return (
+      <span className="message-text">
+        <HighlightedText text={message.text} query={highlight} wholeWord={wholeWord} />
+      </span>
+    );
   const Icon =
     kind === 'audio' ? Music : kind === 'video' ? Play : kind === 'document' ? FileText : ImageIcon;
   return (

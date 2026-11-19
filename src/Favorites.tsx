@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react';
 import { Star, CalendarDays, ArrowRight, Image as ImageIcon } from 'lucide-react';
 import { VirtuosoGrid } from 'react-virtuoso';
 import { MessageBody } from './Attachment';
-import { dayKey, mediaName, mediaKind } from './media.mjs';
+import { dayKey, mediaName, mediaKind, sortByTimestamp } from './media.mjs';
+import { MediaSort } from './MediaSort';
+import type { MediaOrder } from './media.mjs';
 import type { Chat, FavoriteMap, Message } from './types';
 export function FavoriteButton({
   active,
@@ -30,12 +32,16 @@ export function FavoritesView({
   onDay,
   onToggleDay,
   onToggleMedia,
+  sortOrder,
+  onSortChange,
 }: {
   chats: Chat[];
   favorites: FavoriteMap;
   onDay: (id: string, day: string) => void;
   onToggleDay: (id: string, day: string) => void;
   onToggleMedia: (id: string, name: string) => void;
+  sortOrder: MediaOrder;
+  onSortChange: (order: MediaOrder) => void;
 }) {
   const [view, setView] = useState('days'),
     [kind, setKind] = useState('all');
@@ -73,7 +79,11 @@ export function FavoritesView({
       media: media.sort((a, b) => b.message.timestamp - a.message.timestamp),
     };
   }, [chats, favorites]);
-  const visible = saved.media.filter((m) => kind === 'all' || mediaKind(m.message.text) === kind);
+  const visible = sortByTimestamp(
+    saved.media.filter((m) => kind === 'all' || mediaKind(m.message.text) === kind),
+    sortOrder,
+    (item) => item.message.timestamp,
+  );
   return (
     <div className="favorites-view">
       <div className="section-heading">
@@ -140,28 +150,32 @@ export function FavoritesView({
         </div>
       ) : (
         <>
-          <div className="media-filters" role="group" aria-label="Favorite media type">
-            {[
-              ['all', 'All media'],
-              ['image', 'Photos'],
-              ['video', 'Videos'],
-              ['sticker', 'Stickers'],
-              ['audio', 'Audio'],
-              ['document', 'Documents'],
-            ].map(([id, label]) => (
-              <button
-                key={id}
-                className={kind === id ? 'active' : ''}
-                aria-pressed={kind === id}
-                onClick={() => setKind(id)}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="media-toolbar">
+            <div className="media-filters" role="group" aria-label="Favorite media type">
+              {[
+                ['all', 'All media'],
+                ['image', 'Photos'],
+                ['video', 'Videos'],
+                ['sticker', 'Stickers'],
+                ['audio', 'Audio'],
+                ['document', 'Documents'],
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  className={kind === id ? 'active' : ''}
+                  aria-pressed={kind === id}
+                  onClick={() => setKind(id)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <MediaSort value={sortOrder} onChange={onSortChange} />
           </div>
           {visible.length ? (
             <VirtuosoGrid
-              style={{ flex: 1, minHeight: 200 }}
+              style={{ flex: 1, minHeight: 0 }}
+              key={kind + sortOrder}
               data={visible}
               computeItemKey={(_, item) => item.chat.id + item.name}
               listClassName="media-grid"
