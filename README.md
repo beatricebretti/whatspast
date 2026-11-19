@@ -23,21 +23,21 @@ npm run preview
 
 Export a chat from WhatsApp using **Export Chat → Attach Media**. Import its ZIP or select its complete folder. Choose the export date order if automatic detection cannot disambiguate it.
 
-To add later messages to an existing archive, open its **… → Update from export** menu, or choose **Update: conversation name** in the import dialog. 
-
 ## Exploring your archive
 
 - Virtualized message and media lists for large histories.
-- Conversation search and phrase counts by participant.
+- Conversation search and phrase counts by participant. Click a repeated word to highlight it in context, then use the arrows or Enter/Shift+Enter to visit matches. Cmd/Ctrl+K focuses search.
+- Editable conversation names and uploaded photos, saved locally and kept when importing updates.
+- Saved light/dark appearance with Rose, Sage, Ocean, and Plum palettes.
 - Photos, videos, WebP stickers, Opus voice notes, other audio and PDF attachments.
 - Automatic previews near the viewport, with a maximum of three simultaneous reads and native audio/video controls. Codec support depends on the browser.
-- Media filters for Photos, Videos, Stickers, Audio and Documents.
+- Media filters for Photos, Videos, Stickers, Audio and Documents, with newest-first or oldest-first sorting in the media gallery and Favorites.
 - Monthly calendar showing active days. The shared date filter scopes messages, media and insights to one local calendar day.
 - Favorite days from the calendar, date bar, or chat date separators. Favorite media from the gallery or message attachments. The Favorites section collects saved days and media across all conversations.
 - Emoji rankings for everyone or an individual participant, preserving emoji modifiers, flags, keycaps and joined sequences.
 - Daily conversation starters: the first participant message of each local day, including media and excluding system/call events.
-- Call record totals and explicitly attributed call initiators. Generic or missed call entries do not establish who initiated a call. unattributed entries are reported separately. 
-- Participant shares, word rankings, hourly activity, active days and JSON insight exports. 
+- Call record totals and explicitly attributed call initiators. Generic or missed call entries do not establish who initiated a call. unattributed entries are reported separately.
+- Participant shares, word rankings, hourly activity, active days and JSON insight exports.
 - Background workers for parsing, history merging and statistics, keeping interaction responsive.
 - Responsive layout, visible keyboard focus, reduced-motion support and Cmd/Ctrl+I import shortcut.
 
